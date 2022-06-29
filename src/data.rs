@@ -25,7 +25,7 @@ pub struct E64Hdr {
     /// | ET_LOPROC | 0xff00 | Processor-specific
     /// | ET_HIPROC | 0xffff | Processor-specific
     ///
-    r#type: u16,
+    ty: u16,
 
     /// required architecture
     /// ref https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.eheader.html#elfid
@@ -42,20 +42,20 @@ pub struct E64Hdr {
     flags: u32,
     ehsize: u16,  // header size
 
-    ph_tbl_entry_size: u16,  // Bytes of One Entry of Program Header Table
-    ph_tbl_entry_num: u16,  // Program Header Table Entry Count
+    ph_tab_entry_size: u16,  // Bytes of One Entry of Program Header Table
+    ph_tab_entry_num: u16,  // Program Header Table Entry Count
 
-    sh_tbl_entry_size: u16,  // Section Header Table Entry Size
-    sh_tbl_entry_num: u16,   // Section Header Table Entry Number
+    sh_tab_entry_size: u16,  // Section Header Table Entry Size
+    sh_tab_entry_num: u16,   // Section Header Table Entry Number
 
-    sh_strtbl_idx: u16  // Section header string table index
+    sh_strtab_idx: u16  // Section header string table index
 }
 
 #[derive(CopyGetters, Default, Deserialize)]
 #[getset(get_copy = "pub")]
 pub struct E32Hdr {
     ident: EIdent,
-    r#type: u16,
+    ty: u16,
     machine: u16,
     version: u32,
     entry: u32,
@@ -66,49 +66,49 @@ pub struct E32Hdr {
     flags: u32,
     ehsize: u16,
 
-    ph_tbl_entry_size: u16,
-    ph_tbl_entry_num: u16,
+    ph_tab_entry_size: u16,
+    ph_tab_entry_num: u16,
 
-    sh_tbl_entry_size: u16,
-    sh_tbl_entry_num: u16,
+    sh_tab_entry_size: u16,
+    sh_tab_entry_num: u16,
 
-    sh_strtbl_idx: u16
+    sh_strtab_idx: u16
 }
 
 #[derive(CopyGetters, Default, Deserialize, Clone, Copy)]
 #[getset(get_copy = "pub")]
 pub struct EIdent {
     /// Indicate file type
-    magic_nums: [u8; 4],
+    pub(crate) magic_nums: [u8; 4],
 
     /// 0 - Invalid class
     /// 1 - 32 bit object
     /// 2 - 64 bit object
-    class: u8,
+    pub(crate) class: u8,
 
     /// 0 - Invalid data encoding
     /// 1 - LSB (least significant bit, little endian)
     /// 2 - MSB
-    data: u8,
+    pub(crate) data: u8,
 
     /// ELF header version number (EI_VERSION).
     /// Currently, this value must be EV_CURRENT (that's 1, 1.2 is final version of elf)
-    version: u8,
+    pub(crate) version: u8,
 
     /// Identifies the operating system and ABI to which the object is targeted.
     /// Some fields in other ELF structures have flags and values that have operating system or ABI specific meanings.
     /// The interpretation of those fields is determined by the value of this byte
-    osabi: u8,
+    pub(crate) osabi: u8,
 
     /// The interpretation of this version number is dependent on the ABI identified by the EI_OSABI field.
     /// If no values are specified for the EI_OSABI field for the processor,
     /// or no version values are specified for the ABI determined by a particular value of the EI_OSABI byte,
     /// the value 0 is used to indicate unspecified.
-    abiversion: u8,
+    pub(crate) abiversion: u8,
     _pad: [u8; 6],
 
     /// Fixed value: 16, indicate that EIdent bytes
-    nident: u8,
+    pub(crate) nident: u8,
 }
 
 
@@ -136,7 +136,7 @@ pub struct E64Phdr {
     /// | HIOS | 0x6fff_ffff |
     /// | LOPROC | 0x7000_0000 |
     /// | HIPROC | 0x7fff_ffff |
-    r#type: u32,
+    ty: u32,
 
     /// Segement bits X/W/R os, proc spec etc.
     flags: u32,
@@ -167,7 +167,7 @@ pub struct E64Phdr {
 #[derive(CopyGetters, Default, Deserialize)]
 #[getset(get_copy = "pub")]
 pub struct E32Phdr {
-    r#type: u32,
+    ty: u32,
     offset: u32,
 
     vaddr: u32,
@@ -188,11 +188,11 @@ pub struct E32Phdr {
 #[derive(CopyGetters, Default, Deserialize)]
 #[getset(get_copy = "pub")]
 pub struct E64Shdr {
-    /// Section name - string tbl idx
+    /// Section name - string tab idx
     name: u32,
 
     /// Section type
-    r#type: u32,
+    ty: u32,
 
     /// Section flags
     flags: u64,
@@ -226,7 +226,109 @@ pub struct E64Shdr {
     ent_size: u64
 }
 
+#[derive(CopyGetters, Default, Deserialize)]
+#[getset(get_copy = "pub")]
+pub struct E32Shdr {
+    name: u32,
+    ty: u32,
+    flags: u32,
+    addr: u32,
+    offset: u32,
+    size: u32,
+    link: u32,
+    info: u32,
+    addr_align: u32,
+    ent_size: u32
+}
 
+
+////////////////////////////////////////////////////////////////////////////////
+//// Section Data
+
+#[derive(Clone)]
+pub struct StrTab(Vec<u8>);
+
+
+////////////////////////////////////////////////////////////////////////////////
+//// Symbol Table
+
+#[derive(CopyGetters, Default, Deserialize)]
+#[getset(get_copy = "pub")]
+pub struct E64Sym {
+    name: u32,
+    info: u8,
+    other: u8,
+
+    /// Section index
+    shndx: u16,
+
+    size: u64
+}
+
+#[derive(CopyGetters, Default, Deserialize)]
+#[getset(get_copy = "pub")]
+pub struct E32Sym {
+    name: u32,
+    value: u32,
+    size: u32,
+    info: u8,
+    other: u8,
+    shndx: u16
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//// Implementations
+
+
+impl StrTab {
+    pub fn empty() -> Self {
+        StrTab(Vec::new())
+    }
+
+    pub fn new(vec: Vec<u8>) -> Self {
+        Self(vec)
+    }
+
+    pub fn get(&self, idx: usize) -> Option<String> {
+        if idx >= self.0.len() {
+            return None;
+        }
+
+        let mut s = String::new();
+
+        for i in idx..self.0.len() {
+            if self.0[i] == 0 {
+                break;
+            }
+
+            s.push(self.0[i] as char)
+        }
+
+        Some(s)
+    }
+
+    pub fn str_vec(&self) -> Vec<String> {
+        let mut str_vec = vec![];
+
+        if self.0.is_empty() {
+            return str_vec;
+        }
+
+        let mut s = String::new();
+        for i in 1..self.0.len() {
+            if self.0[i] == 0 {
+                str_vec.push(s);
+                s = String::new();
+                continue;
+            }
+
+            s.push(self.0[i] as char);
+        }
+
+        str_vec
+    }
+
+}
 
 
 #[cfg(test)]
