@@ -252,18 +252,27 @@ pub struct StrTab(Vec<u8>);
 ////////////////////////////////////////////////////////////////////////////////
 //// Symbol Table
 
-#[derive(CopyGetters, Default, Deserialize)]
+#[derive(CopyGetters, Default, Deserialize, Debug)]
 #[getset(get_copy = "pub")]
 pub struct E64Sym {
     name: u32,
+
+    /// type and binding
     info: u8,
+
+    /// the first 2 bit indicates that visibility
+    /// the last 6 bit is unspecified
     other: u8,
 
     /// Section index
     shndx: u16,
 
+    /// This member gives the value of the associated symbol.
+    /// Depending on the context, this may be an absolute value, an address, and so on;
+    value: u64,
     size: u64
 }
+
 
 #[derive(CopyGetters, Default, Deserialize)]
 #[getset(get_copy = "pub")]

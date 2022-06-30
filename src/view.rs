@@ -3,7 +3,7 @@ use std::mem::transmute;
 
 use getset::{CopyGetters, Getters};
 
-use crate::data::{E64Hdr, E64Phdr, E64Shdr, StrTab};
+use crate::data::{E64Hdr, E64Phdr, StrTab};
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -135,15 +135,35 @@ pub struct EHdrView {
     prog_hdr_tab_ent_num: u16,
     section_hdr_ent_sz: u16,
     section_hdr_ent_num: u16,
-    section_str_tab_idx: SID
+    section_str_tab_idx: SID,
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Program Header View
 
+#[derive(Getters, Debug)]
+#[getset(get = "pub")]
+pub struct PHdrView {
+    ty: PhType,
+
+    flags: PFLAGS,
+
+    offset: u64,
+
+    vaddr: Hex64,
+
+    paddr: Hex64,
+
+    filesz: u64,
+
+    memsz: u64,
+
+    align: u64
+}
+
 /// (Program header entry) Segemnt Type
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum PhType {
     /// This type indicates this entry should be ignored
@@ -189,9 +209,8 @@ pub enum PhType {
     HOPROC = 0x7fff_ffff,
 }
 
-
 /// https://refspecs.linuxfoundation.org/elf/gabi4+/ch5.pheader.html#p_flags
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum PFlagBit {
     X,
     W,
@@ -200,7 +219,7 @@ pub enum PFlagBit {
     Proc(u8),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PFLAGS(Vec<PFlagBit>);
 
 pub struct E64PhEntries(Option<Vec<E64Phdr>>);
@@ -223,8 +242,6 @@ pub struct SHdrView {
     pub(crate) addr_align: u64,
     pub(crate) ent_size: u64,
 }
-
-
 
 
 /// https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.sheader.html#sh_type
@@ -339,6 +356,92 @@ pub struct SHFLAGS(Vec<SHFlagBit>);
 
 #[derive(Clone)]
 pub struct SHEntries(pub(crate) Vec<SHdrView>);
+
+
+////////////////////////////////////////////////////////////////////////////////
+//// Symbol Table
+
+#[derive(Debug, Clone, Getters)]
+#[getset(get = "pub")]
+pub struct SymView {
+    pub(crate) name: String,
+    pub(crate) bind: SymBinding,
+    pub(crate) ty: SymType,
+    pub(crate) visi: SymVisi,
+    pub(crate) shndx: SID,
+    pub(crate) value: SymValue,
+    pub(crate) size: u64
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum SymBinding {
+    /// 0
+    Local,
+
+    /// 1
+    Global,
+
+    /// 2
+    Weak,
+
+    /// 10-12
+    OS(u8),
+
+    /// 13-15
+    Proc(u8),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum SymType {
+    /// 0, type is unspecified
+    NoType,
+
+    /// 1, data object such as variable, an array and so on.
+    Object,
+
+    /// 2, function or other executable code
+    Func,
+
+    /// 3, The symbol is associated with a section. Symbol table entries of this type exist
+    /// primarily for relocation and normally have STB_LOCAL binding.
+    Section,
+
+    /// 4, Conventionally, the symbol's name gives the name of the
+    /// source file associated with the object file. A file symbol has
+    /// STB_LOCAL binding, its section index is SHN_ABS, and it precedes
+    /// the other STB_LOCAL symbols for the file, if it is present.
+    File,
+
+    /// 5, The symbol labels an uninitialized common block
+    Common,
+
+    /// 6, The symbol specifies a Thread-Local Storage entity.
+    TLS,
+
+    OS(u8),
+
+    Proc(u8),
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum SymVisi {
+    Default = 0,
+    Internal,
+    Hidden,
+    Protected,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum SymValue {
+    Alignment(u64),
+    SectionOffset(u64),
+    VirAddr(Hex64)
+}
+
+#[derive(Clone)]
+pub struct SymTab(pub(crate) Vec<SymView>);
+
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -496,26 +599,6 @@ impl From<u32> for SHFLAGS {
     }
 }
 
-impl Debug for E64Shdr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let shtype = SHType::from(self.ty());
-        let flags = SHFLAGS::from(self.flags() as u32);
-
-        f.debug_struct("E64Shdr")
-            .field("name", &self.name())
-            .field("ty", &shtype)
-            .field("flags", &flags)
-            .field("addr", &Hex64(self.addr()))
-            .field("offset", &Hex64(self.offset()))
-            .field("size", &self.size())
-            .field("link", &self.link())
-            .field("info", &self.info())
-            .field("addr_align", &self.addr_align())
-            .field("ent_size", &self.ent_size())
-            .finish()
-    }
-}
-
 impl Debug for SHEntries {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.0.is_empty() {
@@ -598,7 +681,7 @@ impl Into<EHdrView> for E64Hdr {
             prog_hdr_tab_ent_num: self.ph_tab_entry_num(),
             section_hdr_ent_sz: self.sh_tab_entry_size(),
             section_hdr_ent_num: self.sh_tab_entry_num(),
-            section_str_tab_idx
+            section_str_tab_idx,
         }
     }
 }
@@ -607,7 +690,7 @@ impl SHEntries {
     pub fn get(&self, name: &str) -> Option<&SHdrView> {
         for entry in self.0.iter() {
             if entry.name() == name {
-                return Some(entry)
+                return Some(entry);
             }
         }
 
@@ -615,3 +698,63 @@ impl SHEntries {
     }
 }
 
+impl SymBinding {
+    pub fn load_from_info(info: u8) -> Self {
+        let val = info >> 4;
+
+        match val {
+            0 => Self::Local,
+            1 => Self::Global,
+            2 => Self::Weak,
+            x => {
+                if 10 <= x && x <= 12 {
+                    Self::OS(x)
+                } else {
+                    Self::Proc(x)
+                }
+            }
+        }
+    }
+}
+
+impl SymType {
+    pub fn load_from_info(info: u8) -> Self {
+        let val = info & 0xf;
+
+        match val {
+            0 => Self::NoType,
+            1 => Self::Object,
+            2 => Self::Func,
+            3 => Self::Section,
+            4 => Self::File,
+            5 => Self::Common,
+            6 => Self::TLS,
+            x => {
+                if 10 <= x && x <= 12 {
+                    Self::OS(x)
+                } else {
+                    Self::Proc(x)
+                }
+            }
+        }
+    }
+}
+
+impl SymVisi {
+    pub fn load_from_other(other: u8) -> Self {
+        let val = other & 0x3;
+
+        unsafe { std::mem::transmute(val) }
+    }
+}
+
+impl Debug for SymTab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+        for (i, entry) in self.0.iter().enumerate() {
+            writeln!(f, "{}: {:?}", i, entry)?;
+        }
+
+        Ok(())
+    }
+}
