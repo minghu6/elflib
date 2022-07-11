@@ -144,6 +144,7 @@ impl Elf {
         let dynsym =
             load_sym64tab_from_sh(&shentries, ".dynsym", &&dynstr, ehdr.ty(), &mmap)?;
 
+        #[allow(unused)]
         if let Some(sh) = shentries.get(".bss") {
             let sec_offset = sh.offset().0 as usize;
             let sec_size = *sh.size() as usize;
@@ -152,9 +153,8 @@ impl Elf {
                 mmap[sec_offset..sec_offset + sec_size].iter().cloned(),
             );
 
-            println!(".bss raw data {:?}", raw)
+            // println!(".bss raw data {:?}", raw)
         }
-
 
 
         Ok(Self {
