@@ -75,6 +75,7 @@ pub struct E32Hdr {
     sh_strtab_idx: u16
 }
 
+#[repr(C)]
 #[derive(CopyGetters, Default, Deserialize, Clone, Copy)]
 #[getset(get_copy = "pub")]
 pub struct EIdent {

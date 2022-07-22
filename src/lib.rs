@@ -1,4 +1,3 @@
-#![feature(derive_default_enum)]
 #![feature(arbitrary_enum_discriminant)]
 
 pub mod view;
