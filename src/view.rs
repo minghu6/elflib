@@ -219,6 +219,7 @@ pub enum PFlagBit {
     Proc(u8),
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct PFLAGS(Vec<PFlagBit>);
 
@@ -351,6 +352,7 @@ pub enum SHFlagBit {
     Proc(u8),
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct SHFLAGS(Vec<SHFlagBit>);
 

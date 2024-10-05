@@ -1,5 +1,3 @@
-#![feature(arbitrary_enum_discriminant)]
-
 pub mod view;
 pub mod data;
 pub mod ctrl;
